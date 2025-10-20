@@ -42,6 +42,10 @@ class GarmentSegmenter:
         self.model = YOLO(model_path)
         self.conf_threshold = conf_threshold
 
+        # Log available classes
+        print(f"Model classes: {self.model.names}")
+        print(f"Confidence threshold: {conf_threshold}")
+
         # Person tracking state
         self.person_trackers = {}  # person_id -> {bbox, kalman_filter, last_seen, garments}
         self.next_person_id = 0
@@ -79,26 +83,43 @@ class GarmentSegmenter:
         # Run YOLOv8 inference
         predictions = self.model(image, conf=self.conf_threshold, verbose=False)
 
-        if len(predictions) == 0 or predictions[0].masks is None:
-            # Clean up old trackers
+        if len(predictions) == 0:
+            print("DEBUG: No predictions returned from YOLO")
             self._cleanup_trackers()
             return results
 
         pred = predictions[0]
+
+        # Debug: log what was detected
+        if pred.boxes is not None and len(pred.boxes) > 0:
+            detected_classes = [self.model.names[int(box.cls[0])] for box in pred.boxes]
+            print(f"DEBUG: Detected {len(pred.boxes)} objects: {detected_classes}")
+        else:
+            print("DEBUG: Predictions returned but no boxes detected")
+
+        if pred.masks is None:
+            print("DEBUG: No masks in predictions (model may not support segmentation or no objects detected)")
+            self._cleanup_trackers()
+            return results
 
         # Group detections by person (spatial clustering)
         person_groups = self._group_by_person(pred, image.shape)
 
         # Process each person's garments
         for person_id, garment_detections in person_groups.items():
+            print(f"DEBUG: Processing {len(garment_detections)} garments for person {person_id}")
             for det in garment_detections:
                 garment = self._process_garment(image, det, person_id)
                 if garment:
                     results.append(garment)
+                    print(f"DEBUG: Added garment: {garment['category']} (stable: {garment['stable']})")
+                else:
+                    print(f"DEBUG: Garment processing returned None (likely too small or no contours)")
 
         # Clean up old cached garments
         self._cleanup_garment_cache()
 
+        print(f"DEBUG: Returning {len(results)} garments total")
         return results
 
     def _group_by_person(self, pred, image_shape: Tuple[int, int, int]) -> Dict[int, List]:
@@ -111,13 +132,42 @@ class GarmentSegmenter:
             box = pred.boxes[i]
             mask = pred.masks[i] if pred.masks is not None else None
             cls_id = int(box.cls[0])
+            class_name = self.model.names[cls_id] if hasattr(self.model, 'names') else str(cls_id)
 
-            detections.append({
-                'bbox': box.xyxy[0].cpu().numpy(),
-                'conf': float(box.conf[0]),
-                'class': self.model.names[cls_id] if hasattr(self.model, 'names') else str(cls_id),
-                'mask': mask.data[0].cpu().numpy() if mask is not None else None
-            })
+            # WORKAROUND: If using COCO model, only use 'person' detections
+            # and split them into synthetic garments (top/bottom)
+            if class_name == 'person':
+                # Split person bbox into top (torso) and bottom (legs)
+                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                height = y2 - y1
+
+                # Top garment (upper 60% of person)
+                detections.append({
+                    'bbox': np.array([x1, y1, x2, y1 + height * 0.6]),
+                    'conf': float(box.conf[0]),
+                    'class': 'short_sleeve_top',  # Synthetic class
+                    'mask': mask.data[0].cpu().numpy() if mask is not None else None
+                })
+
+                # Bottom garment (lower 50% of person, overlaps with top)
+                detections.append({
+                    'bbox': np.array([x1, y1 + height * 0.5, x2, y2]),
+                    'conf': float(box.conf[0]),
+                    'class': 'trousers',  # Synthetic class
+                    'mask': mask.data[0].cpu().numpy() if mask is not None else None
+                })
+                print(f"DEBUG: Converted person detection to synthetic top+bottom garments")
+            elif class_name in self.CATEGORY_MAP or class_name.lower() in [k.lower() for k in self.CATEGORY_MAP.keys()]:
+                # Fashion-specific model - use detected garment directly
+                detections.append({
+                    'bbox': box.xyxy[0].cpu().numpy(),
+                    'conf': float(box.conf[0]),
+                    'class': class_name,
+                    'mask': mask.data[0].cpu().numpy() if mask is not None else None
+                })
+            else:
+                # Skip non-fashion classes from COCO model
+                print(f"DEBUG: Skipping non-fashion class: {class_name}")
 
         # Simple spatial clustering: compute center of each garment
         # Group garments that are close together vertically and horizontally

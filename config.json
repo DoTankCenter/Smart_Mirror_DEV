@@ -1,0 +1,7 @@
+{
+  "dataset_directory": "D:\\Warg\u00f6n\\clothing_v3\\station1\\apr2023",
+  "metadata_file": "",
+  "model_path": "yolov8n-seg.pt",
+  "conf_threshold": 0.5,
+  "max_similar_items": 10
+}

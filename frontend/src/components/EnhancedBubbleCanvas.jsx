@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import EnhancedBubblePhysics from '../physics/EnhancedBubblePhysics'
 import './BubbleCanvas.css'

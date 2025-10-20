@@ -1,4 +1,4 @@
-﻿export default class CameraStream {
+export default class CameraStream {
   constructor(wsUrl) {
     this.wsUrl = wsUrl
     this.ws = null
@@ -6,10 +6,30 @@
     this.videoElement = null
     this.canvas = null
     this.isStreaming = false
+    this.debugMode = false
+    this.frameCount = 0
+    this.lastResponseTime = null
 
     this.onConnect = null
     this.onDisconnect = null
     this.onGarments = null
+    this.onDebugInfo = null
+  }
+
+  setDebugMode(enabled) {
+    this.debugMode = enabled
+    if (this.videoElement && enabled) {
+      this.videoElement.style.cssText = 'position: fixed; top: 80px; left: 20px; width: 320px; height: 240px; z-index: 1000; border: 2px solid #4ecdc4; border-radius: 8px;'
+      document.body.appendChild(this.videoElement)
+    } else if (this.videoElement && !enabled) {
+      if (this.videoElement.parentElement) {
+        this.videoElement.parentElement.removeChild(this.videoElement)
+      }
+    }
+  }
+
+  getVideoElement() {
+    return this.videoElement
   }
 
   async connect() {
@@ -53,6 +73,17 @@
 
       this.ws.onmessage = (event) => {
         const data = JSON.parse(event.data)
+        this.lastResponseTime = Date.now()
+
+        if (this.debugMode && this.onDebugInfo) {
+          this.onDebugInfo({
+            frameCount: this.frameCount,
+            garmentsDetected: data.garments ? data.garments.length : 0,
+            lastResponse: new Date().toLocaleTimeString(),
+            garmentData: data.garments
+          })
+        }
+
         if (data.garments && this.onGarments) {
           this.onGarments(data.garments)
         }
@@ -89,6 +120,11 @@
 
       // Send to backend
       this.ws.send(JSON.stringify({ frame: frameData }))
+      this.frameCount++
+
+      if (this.debugMode) {
+        console.log(`Frame ${this.frameCount} sent to backend`)
+      }
 
       // Send next frame (throttle to ~10 FPS for processing)
       setTimeout(sendFrame, 100)

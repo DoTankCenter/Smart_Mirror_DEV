@@ -1,4 +1,4 @@
-﻿import Matter from 'matter-js'
+import Matter from 'matter-js'
 
 export default class BubblePhysics {
   constructor(width, height, config = {}) {

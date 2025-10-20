@@ -1,4 +1,4 @@
-﻿.app {
+.app {
   width: 100vw;
   height: 100vh;
   position: relative;
@@ -53,4 +53,51 @@
   50% {
     opacity: 0.5;
   }
+}
+
+.top-buttons {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 100;
+  display: flex;
+  gap: 12px;
+}
+
+.debug-button,
+.settings-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  padding: 12px 24px;
+  border-radius: 25px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.debug-button {
+  background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
+  box-shadow: 0 4px 20px rgba(78, 205, 196, 0.4);
+}
+
+.debug-button:hover,
+.settings-button:hover {
+  transform: translateY(-2px);
+}
+
+.debug-button:hover {
+  box-shadow: 0 8px 30px rgba(78, 205, 196, 0.6);
+}
+
+.settings-button:hover {
+  box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+}
+
+.debug-button:active,
+.settings-button:active {
+  transform: translateY(0);
 }

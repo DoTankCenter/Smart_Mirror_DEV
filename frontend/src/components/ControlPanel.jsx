@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import './ControlPanel.css'
 
 export default function ControlPanel({ config, onChange }) {
